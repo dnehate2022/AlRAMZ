@@ -723,6 +723,12 @@ def main_trading_extraction(
         extracted_text
     )
     result1 = remove_whitespace_from_json(result)
+    market = result1["market"].upper()
+ 
+    if 'X' in market:
+            result1["market"] = "ADX"
+    elif 'F' in market:
+            result1["market"] = "DFM"
     if result1:
         combined_input = result1.get("combined_input_token")
         combined_output = result1.get("combined_output_token")
