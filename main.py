@@ -256,94 +256,120 @@ class PDFProcessor:
             # Do not summarize."""
 
 
-            prompt = f"""Extract ALL text from this trading order form image exactly as it appears, page {page_num}.
-
+            prompt = f"""
+                Extract ALL text from this trading order form image exactly as it appears, page {page_num}.
+ 
                 This is a bilingual document (Arabic/English). Extract BOTH languages for every field.
-
+ 
                 CRITICAL: Do not skip ANY fields, including:
                 - Guardian/Attorney's Name (if any)
                 - All checkboxes (marked or unmarked)
                 - All form fields (filled or empty)
                 - All headers and labels
                 - All numbers, signatures, and stamps
-
+ 
+                NUMBER RECOGNITION:
+                    0 = round oval | 1 = straight line | 2 = curve+line | 3 = two curves
+                    4 = triangle top | 5 = flat top+curve | 6 = loop bottom | 7 = angled line
+                    8 = two loops | 9 = loop top+line
+               
+                - Numbers: 0(oval), 1(line), 2(curve+line), 3(2curves), 4(triangle), 5(flat+curve), 6(loop-bottom), 7(line±bar), 8(2loops), 9(loop-top)
+ 
+ 
+                CRITICAL VALIDATION RULES:
+   
+                    For DATE field:
+                    - Current year is 2024-2025
+                    - Trading orders are NEVER from years before 2020
+                    - If you see a year like "2015" or "2016", it's likely an OCR error
+                    - The actual year is probably "2025" or "2026"
+                    - Common misreads: 5→5 confusion, 2→1 confusion
+                    - Double-check handwritten years carefully
+                      example :"01-07-2025",
+ 
                 Output in clean markdown format following this structure:
-
+ 
                 === PAGE {page_num} ===
-
+ 
                 # [Company Name/Logo]
-
+ 
                 **Market:** السوق (The Market)
                    eg(ADX,DFM)
                    wrong Extraction 'AX' then convert to 'ADX'
-                   wrong Extraction 'AFM' then convert to 'DFM' 
-
-
-                **Market:** [value] | **Date:** [value] | **Time:** [value]
-
+                   wrong Extraction 'AFM' then convert to 'DFM'
+                   [value]
+ 
+                **Date:** [value]
+                   example :"01-07-2025"
+ 
+                **Time:** [value]
+ 
                 ## Action Type / نوع العملية
+                 Action Type should be extract as it with present in pdf
+                 Example :
                 - [ ] Buy / شراء
                 - [✓] Sell / بيع  
                 - [ ] Modify / تعديل
                 - [ ] Cancel / الغاء
-
+ 
                 ## Investor Information
-
+ 
                 **Investor's Name / اسم المستثمر:**  
                 [exact name as written]
-
+ 
                 **Guardian/Attorney's Name (if any) / اسم الوصي/الوكيل/ولي(ان وجد):**  
                 [exact name as written]
-
+ 
                 ## Trading Account / رقم نوع حساب التداول
-
+ 
                 **Type:**
                 - [✓] Cash / نقدي
                 - [ ] Margin / هامش
                 - [ ] Derivative / مشتقات
-
+ 
                 **Account Number / رقم الحساب:** [number]
-
+ 
                 ## Security Details
-
+ 
                 **Security Name / اسم الورقة المالية:** [name]
-
+ 
                 **Security Volume / عدد الاوراق المالية:**
                 - Quantity / عدد الكمية: [number]
                 - Equivalent to / يعادل اسهم الحية: [if filled]
-
+ 
                 ## Order Type / نوع الامر
-
+ 
                 **Root Price / السعر بسعر:**
                 - [ ] Market Price / سعر السوق
                 - [✓] Limit Price / سعر محدد
-
+ 
                 **Price / السعر:** [value]
-
+ 
                 **Floor Price / الارنى السعر:**
                 - [ ] TWAP / السعر المعدل(المتوسط)
                 - [ ] POV / نسبة الحجم
                 - [ ] End Price / نهاية بسعر
-
+ 
                 ## Order Validity / صلاحية الامر
                 - [✓] Daily / يومي
                 - [ ] GTD / محدد بتاريخ
                 - [ ] GTDC / حتى الالغاء
                 - [ ] GTC / حتى الاقفال
-
+ 
                 ## Authorization / التوقيع
-
+ 
                 **Signature / Company Stamp / توقيع و ختم الشركة:**  
                 [signature details]
-
+ 
                 **Name:** [name]  
                 **Reference:** [reference number]
-
+ 
                 **Note:** [any footer notes]
-
+ 
                 ---
-
-                Extract with 100% accuracy. Include every visible character."""
+ 
+                Extract with 100% accuracy. Include every visible character.
+                """
             
             response = model.generate_content([prompt, img])
             page_text = response.text
