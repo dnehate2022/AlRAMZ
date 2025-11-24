@@ -96,7 +96,7 @@ with st.sidebar:
     force_retrain = st.checkbox("Force Model Retraining", value=False)
     
     # Model cache status
-    model_exists = os.path.exists("models/trading_extractor.json")
+    model_exists = os.path.exists("<models/trading_extractor.json")
     if model_exists:
         st.success("✅ Trained model cached")
     else:
@@ -130,7 +130,7 @@ with col2:
                     from main import main_trading_extraction
                     
                     # Show model status
-                    model_path = "Model/trading_extractor.json"
+                    model_path = "models/trading_extractor.json"
                     if os.path.exists(model_path) and not force_retrain:
                         st.info("ℹ️ Using cached trained model (faster)...")
                     else:
