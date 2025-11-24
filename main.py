@@ -84,6 +84,8 @@ class TradingOrderExtractor(dspy.Signature):
     - Format: "Arabic (English)" if both present, e.g., "السوق (ADX)"
     - if 'AX' THEN Convert to "ADX"
     
+    for Date-example 18/7/2025
+    Numbers: 0(oval), 1(line), 2(curve+line), 3(2curves), 4(triangle), 5(flat+curve), 6(loop-bottom), 7(line±bar), 8(2loops), 9(loop-top)
     date = Transaction Date
     - Look for: "Date:", "التاريخ", date fields in header
     - Format: MM/DD/YY or DD/MM/YYYY as shown in document
@@ -171,6 +173,16 @@ class TradingOrderExtractor(dspy.Signature):
     - Numbers should be extracted without thousand separators
     - Times can be 12-hour or 24-hour format as shown
     - Arabic text should be preserved exactly as written
+    NUMBER RECOGNITION:
+    0 = round oval | 1 = straight line | 2 = curve+line | 3 = two curves
+    4 = triangle top | 5 = flat top+curve | 6 = loop bottom | 7 = angled line
+    8 = two loops | 9 = loop top+line
+
+    LETTER vs NUMBER:
+    O (letter) = usually larger, in words | 0 (zero) = in numbers, smaller
+    S (letter) = in words | 5 (five) = in numbers, has flat top
+    I/l (letter) = in words | 1 (one) = in numbers
+    B (letter) = in words | 8 (eight) = in numbers
     """
     
     document_images: List[dspy.Image] = dspy.InputField(
