@@ -84,6 +84,8 @@ class TradingOrderExtractor(dspy.Signature):
     - Format: "Arabic (English)" if both present, e.g., "السوق (ADX)"
     - if 'AX' THEN Convert to "ADX"
     
+    for Date-example 18/7/2025
+    Numbers: 0(oval), 1(line), 2(curve+line), 3(2curves), 4(triangle), 5(flat+curve), 6(loop-bottom), 7(line±bar), 8(2loops), 9(loop-top)
     date = Transaction Date
     - Look for: "Date:", "التاريخ", date fields in header
     - Format: MM/DD/YY or DD/MM/YYYY as shown in document
@@ -171,6 +173,16 @@ class TradingOrderExtractor(dspy.Signature):
     - Numbers should be extracted without thousand separators
     - Times can be 12-hour or 24-hour format as shown
     - Arabic text should be preserved exactly as written
+    NUMBER RECOGNITION:
+    0 = round oval | 1 = straight line | 2 = curve+line | 3 = two curves
+    4 = triangle top | 5 = flat top+curve | 6 = loop bottom | 7 = angled line
+    8 = two loops | 9 = loop top+line
+
+    LETTER vs NUMBER:
+    O (letter) = usually larger, in words | 0 (zero) = in numbers, smaller
+    S (letter) = in words | 5 (five) = in numbers, has flat top
+    I/l (letter) = in words | 1 (one) = in numbers
+    B (letter) = in words | 8 (eight) = in numbers
     """
     
     document_images: List[dspy.Image] = dspy.InputField(
@@ -244,101 +256,125 @@ class PDFProcessor:
             # Do not summarize."""
 
 
-            prompt = f"""Extract ALL text from this trading order form image exactly as it appears, page {page_num}.
-
+            prompt = f"""
+                Extract ALL text from this trading order form image exactly as it appears, page {page_num}.
+ 
                 This is a bilingual document (Arabic/English). Extract BOTH languages for every field.
-
+ 
                 CRITICAL: Do not skip ANY fields, including:
                 - Guardian/Attorney's Name (if any)
                 - All checkboxes (marked or unmarked)
                 - All form fields (filled or empty)
                 - All headers and labels
                 - All numbers, signatures, and stamps
-
+ 
+                NUMBER RECOGNITION:
+                    0 = round oval | 1 = straight line | 2 = curve+line | 3 = two curves
+                    4 = triangle top | 5 = flat top+curve | 6 = loop bottom | 7 = angled line
+                    8 = two loops | 9 = loop top+line
+               
+                - Numbers: 0(oval), 1(line), 2(curve+line), 3(2curves), 4(triangle), 5(flat+curve), 6(loop-bottom), 7(line±bar), 8(2loops), 9(loop-top)
+ 
+ 
+                CRITICAL VALIDATION RULES:
+   
+                For DATE field:
+                - Current year is 2025
+                - Trading orders are NEVER from years before 2025
+                - If you see a year like "2015", "2016", "2024" or earlier, it's likely an OCR error or outdated
+                - The actual year should be "2025" or "2026"
+                - Year corrections:
+                    - "2024" → "2025"
+                    - "2015" → "2025"
+                    - "2016" → "2025" (or "2026")
+                    - Any year < 2025 → "2025"
+                - Common misreads: 5→5 confusion, 2→1 confusion, 4→5 confusion
+                - Double-check handwritten years carefully
+                - Example output: "01-07-2025"
+ 
                 Output in clean markdown format following this structure:
-
+ 
                 === PAGE {page_num} ===
-
+ 
                 # [Company Name/Logo]
-
+ 
                 **Market:** السوق (The Market)
                    eg(ADX,DFM)
                    wrong Extraction 'AX' then convert to 'ADX'
-                   wrong Extraction 'AFM' then convert to 'DFM' 
-
-                
-                **Market:** [value] | **Date:** [value] | **Time:** [value]
-                - Numbers: 0(oval), 1(line), 2(curve+line), 3(2curves), 4(triangle), 5(flat+curve), 6(loop-bottom), 7(line±bar), 8(2loops), 9(loop-top)
-                
-                NUMBER RECOGNITION:
-                0 = round oval | 1 = straight line | 2 = curve+line | 3 = two curves
-                4 = triangle top | 5 = flat top+curve | 6 = loop bottom | 7 = angled line
-                8 = two loops | 9 = loop top+line
-                
-                
+                   wrong Extraction 'AFM' then convert to 'DFM'
+                   [value]
+ 
+                **Date:** [value]
+                   example :"01-07-2025"
+ 
+                **Time:** [value]
+ 
                 ## Action Type / نوع العملية
+                 Action Type should be extract as it with present in pdf
+                 Example :
                 - [ ] Buy / شراء
                 - [✓] Sell / بيع  
                 - [ ] Modify / تعديل
                 - [ ] Cancel / الغاء
-
+ 
                 ## Investor Information
-
+ 
                 **Investor's Name / اسم المستثمر:**  
                 [exact name as written]
-
+ 
                 **Guardian/Attorney's Name (if any) / اسم الوصي/الوكيل/ولي(ان وجد):**  
                 [exact name as written]
-
+ 
                 ## Trading Account / رقم نوع حساب التداول
-
+ 
                 **Type:**
                 - [✓] Cash / نقدي
                 - [ ] Margin / هامش
                 - [ ] Derivative / مشتقات
-
+ 
                 **Account Number / رقم الحساب:** [number]
-
+ 
                 ## Security Details
-
+ 
                 **Security Name / اسم الورقة المالية:** [name]
-
+ 
                 **Security Volume / عدد الاوراق المالية:**
                 - Quantity / عدد الكمية: [number]
                 - Equivalent to / يعادل اسهم الحية: [if filled]
-
+ 
                 ## Order Type / نوع الامر
-
+ 
                 **Root Price / السعر بسعر:**
                 - [ ] Market Price / سعر السوق
                 - [✓] Limit Price / سعر محدد
-
+ 
                 **Price / السعر:** [value]
-
+ 
                 **Floor Price / الارنى السعر:**
                 - [ ] TWAP / السعر المعدل(المتوسط)
                 - [ ] POV / نسبة الحجم
                 - [ ] End Price / نهاية بسعر
-
+ 
                 ## Order Validity / صلاحية الامر
                 - [✓] Daily / يومي
                 - [ ] GTD / محدد بتاريخ
                 - [ ] GTDC / حتى الالغاء
                 - [ ] GTC / حتى الاقفال
-
+ 
                 ## Authorization / التوقيع
-
+ 
                 **Signature / Company Stamp / توقيع و ختم الشركة:**  
                 [signature details]
-
+ 
                 **Name:** [name]  
                 **Reference:** [reference number]
-
+ 
                 **Note:** [any footer notes]
-
+ 
                 ---
-
-                Extract with 100% accuracy. Include every visible character."""
+ 
+                Extract with 100% accuracy. Include every visible character.
+                """
             
             response = model.generate_content([prompt, img])
             page_text = response.text
@@ -692,6 +728,12 @@ def main_trading_extraction(
         extracted_text
     )
     result1 = remove_whitespace_from_json(result)
+    market = result1["market"].upper()
+ 
+    if 'X' in market:
+            result1["market"] = "ADX"
+    elif 'F' in market:
+            result1["market"] = "DFM"
     if result1:
         combined_input = result1.get("combined_input_token")
         combined_output = result1.get("combined_output_token")
